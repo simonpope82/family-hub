@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1420">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Family">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/favicon.png">
+
+<title>Family Hub</title>
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+<header class="top">
+  <h1>🏠 Family Hub</h1>
+  <nav class="tabs" id="tabs">
+    <button data-tab="home" class="active">Home</button>
+    <button data-tab="week">Week</button>
+    <button data-tab="school">School</button>
+    <button data-tab="meals">Meals</button>
+    <button data-tab="calendars">Calendars</button>
+    <button data-tab="settings">Settings</button>
+  </nav>
+  <a class="kitchen" href="/trip">🌴 Costa Rica trip</a> <a class="kitchen" href="/kitchen">📺 Kitchen screen</a> <a href="/logout" class="small muted" style="text-decoration:none">Sign out</a>
+</header>
+<main id="view"></main>
+<script src="/app.js"></script>
+</body>
+</html>

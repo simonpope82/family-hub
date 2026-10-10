@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0f1420">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Family">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" href="/favicon.png">
+<title>Family Hub — Kitchen</title>
+<style>
+  :root{--bg:#0f1420;--card:#1a2130;--text:#f2f4f8;--muted:#9aa4b8;--line:#2a3345}
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--text);font:clamp(16px,1.6vw,26px)/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden;cursor:none}
+  .wrap{display:grid;grid-template-rows:auto 1fr;height:100vh;padding:1.6vw;gap:1.2vw}
+  header{display:flex;align-items:flex-end;gap:2vw}
+  .clock{font-size:clamp(48px,7vw,140px);font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+  .date{font-size:clamp(20px,2.4vw,46px);color:var(--muted)}
+  .now{margin-left:auto;text-align:right;font-size:clamp(20px,2.4vw,46px)}
+  .now .t{font-size:clamp(36px,4.5vw,90px);font-weight:700}
+  .cols{display:grid;grid-template-columns:1.25fr 1fr;gap:1.2vw;min-height:0}
+  .col{display:flex;flex-direction:column;gap:1.2vw;min-height:0}
+  .card{background:var(--card);border-radius:18px;padding:1.2vw 1.4vw;min-height:0;overflow:hidden}
+  .card h2{margin:0 0 .6vw;font-size:1em;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+  .grow{flex:1}
+  .ev{display:flex;gap:.9vw;align-items:center;padding:.45vw 0;border-bottom:1px solid var(--line)}
+  .ev:last-child{border:0}
+  .ev .time{width:6.5em;flex:none;color:var(--muted);font-variant-numeric:tabular-nums}
+  .ev .who{flex:none;padding:.1em .6em;border-radius:999px;font-weight:700;color:#0f1420;font-size:.8em}
+  .ev .title{font-weight:600}
+  .ev.past{opacity:.4}
+  .ev.away{opacity:.45}
+  .people{display:flex;flex-wrap:wrap;gap:.6vw;margin-bottom:.6vw}
+  .people span{padding:.15em .7em;border-radius:999px;font-weight:700;color:#0f1420;font-size:.85em}
+  .people span.away{background:transparent!important;color:var(--muted);border:2px dashed var(--line)}
+  .parts{display:grid;grid-template-columns:repeat(3,1fr);gap:.8vw}
+  .part{background:#222b3d;border-radius:14px;padding:.8vw}
+  .part .lbl{color:var(--muted);font-size:.85em}
+  .part .big{font-size:1.7em;font-weight:700}
+  .part .sum{font-size:.75em;color:var(--muted)}
+  .tips{margin:.8vw 0 0;padding:0;list-style:none}
+  .tips li{padding:.35vw .6vw;margin-bottom:.4vw;background:#24324a;border-radius:10px}
+  .meal{font-size:1.6em;font-weight:700}
+  .bought{display:inline-block;padding:.15em .7em;border-radius:999px;font-weight:700;font-size:.8em;margin-left:.5em;vertical-align:middle}
+  .bought.yes{background:#22c58b;color:#0f1420}.bought.no{background:#e5484d;color:#fff}
+  .rem{font-size:.85em;font-weight:500;line-height:1.3;padding:.45vw .7vw;border-radius:10px;background:#2b2a1d;margin-bottom:.45vw}
+  .rem.travel{background:#1d2b45}.rem.birthday{background:#3a1f33}
+  .muted{color:var(--muted)}
+  .err{color:#e5484d;font-size:.7em}
+</style>
+</head>
+<body>
+<a href="/" style="position:fixed;right:10px;bottom:8px;color:#9aa4b8;opacity:.35;text-decoration:none;font-size:14px;z-index:9">⌂ app</a>
+<div class="wrap">
+  <header>
+    <div><div class="clock" id="clock">--:--</div><div class="date" id="date"></div></div>
+    <div class="now" id="now"></div>
+  </header>
+  <div class="cols">
+    <div class="col">
+      <div class="card grow"><h2>Today</h2><div class="people" id="people"></div><div id="events"></div></div>
+      <div class="card"><h2>Dinner</h2><div id="meal"></div></div>
+    </div>
+    <div class="col">
+      <div class="card"><h2 id="wtitle">Weather</h2><div id="weather"></div></div>
+      <div class="card grow"><h2>Remember</h2><div id="reminders"></div></div>
+    </div>
+  </div>
+</div>
+<script src="/kitchen.js"></script>
+</body>
+</html>

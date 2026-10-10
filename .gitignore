@@ -1,0 +1,15 @@
+# private / runtime data — never commit
+data/
+config/auth.json
+private/
+RENDER_ENV.txt
+*.secret
+.env
+.env.*
+node_modules/
+*.log
+logs/
+*.bak
+*.bak-*
+*.tmp
+.DS_Store

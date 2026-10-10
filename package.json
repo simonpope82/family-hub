@@ -1,0 +1,19 @@
+{
+  "name": "family-hub",
+  "version": "1.0.0",
+  "description": "Simple family calendar/kitchen-screen hub",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "node-ical": "^0.20.1"
+  },
+  "private": true,
+  "engines": {
+    "node": "20.x"
+  }
+}
