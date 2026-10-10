@@ -330,16 +330,83 @@ function mergeTips(parts) {
   });
 }
 
-async function getWeather(force = false) {
-  const loc = DATA.settings.location;
-  const key = `${loc.latitude},${loc.longitude}`;
-  if (!force && weatherCache && weatherCache.key === key && Date.now() - weatherCache.at < 15 * 60 * 1000) return weatherCache.data;
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}` +
+// Providers: MET Norway Locationforecast 2.0 (primary, server-side only, cached, respects Expires /
+// If-Modified-Since, max one refresh per 30 min) -> Open-Meteo (fallback) -> last good data (stale).
+const WX_UA = process.env.WEATHER_USER_AGENT || 'FamilyHub/1.0 (https://family-pope.onrender.com) simpope@gmail.com';
+const WX_MIN_REFRESH = 30 * 60 * 1000;
+const WX_FORCE_MIN = 5 * 60 * 1000;
+const metCache = { key: null, raw: null, lastModified: null, expires: 0, at: 0 };
+const omCache = { key: null, raw: null, at: 0 };
+let lastGoodWeather = null; // { key, data }
+// MET symbol_code (without _day/_night/_polartwilight) -> WMO-style code used by the icons/descriptions above
+const MET_SYMBOL = { clearsky: 0, fair: 1, partlycloudy: 2, cloudy: 3, fog: 45,
+  lightrain: 61, rain: 63, heavyrain: 65, lightrainshowers: 80, rainshowers: 81, heavyrainshowers: 82,
+  lightsleet: 66, sleet: 66, heavysleet: 67, lightsleetshowers: 80, sleetshowers: 81, heavysleetshowers: 82,
+  lightsnow: 71, snow: 73, heavysnow: 75, lightsnowshowers: 85, snowshowers: 85, heavysnowshowers: 86 };
+function metCode(sym) {
+  if (!sym) return null;
+  const s = String(sym).replace(/_(day|night|polartwilight)$/, '');
+  if (s.includes('thunder')) return 95;
+  return MET_SYMBOL[s] ?? null;
+}
+function localHourStr(iso, tz) {
+  const f = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+  const o = Object.fromEntries(f.formatToParts(new Date(iso)).map(p => [p.type, p.value]));
+  return `${o.year}-${o.month}-${o.day}T${o.hour}:${o.minute}`;
+}
+// Australian BoM apparent temperature (same formula Open-Meteo uses), used if MET omits apparent_air_temperature
+function apparentT(t, rh, ws) { if (t == null) return null; if (rh == null || ws == null) return t; const e = rh / 100 * 6.105 * Math.exp(17.27 * t / (237.7 + t)); return t + 0.33 * e - 0.70 * ws - 4.0; }
+
+async function fetchMet(lat, lon, force) {
+  const key = `${lat},${lon}`;
+  const now = Date.now();
+  if (metCache.key === key && metCache.raw) {
+    const due = Math.max(metCache.expires, metCache.at + WX_MIN_REFRESH);
+    if (now < due && !(force && now - metCache.at >= WX_FORCE_MIN)) return metCache.raw;
+  }
+  const headers = { 'User-Agent': WX_UA, Accept: 'application/json' };
+  if (metCache.key === key && metCache.lastModified) headers['If-Modified-Since'] = metCache.lastModified;
+  const res = await fetch(`https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=${lat}&lon=${lon}`, { headers, signal: AbortSignal.timeout(15000) });
+  const exp = Date.parse(res.headers.get('expires') || '') || 0;
+  if (res.status === 304 && metCache.raw) { metCache.at = now; metCache.expires = exp; return metCache.raw; }
+  if (!res.ok) throw new Error(`MET Norway HTTP ${res.status}`);
+  const raw = await res.json();
+  if (!raw?.properties?.timeseries?.length) throw new Error('MET Norway: empty forecast');
+  Object.assign(metCache, { key, raw, lastModified: res.headers.get('last-modified'), expires: exp, at: now });
+  console.log(`[weather] MET Norway fetched ${key} (expires ${res.headers.get('expires')})`);
+  return raw;
+}
+function metToHourly(raw, tz) {
+  const H = { time: [], temperature_2m: [], apparent_temperature: [], precipitation_probability: [], precipitation: [], weather_code: [], wind_speed_10m: [] };
+  for (const s of raw.properties.timeseries) {
+    const n1 = s.data.next_1_hours;
+    if (!n1) continue; // hourly steps only (covers today + tomorrow)
+    const d = s.data.instant?.details || {};
+    H.time.push(localHourStr(s.time, tz));
+    H.temperature_2m.push(d.air_temperature ?? null);
+    H.apparent_temperature.push(d.apparent_air_temperature ?? apparentT(d.air_temperature, d.relative_humidity, d.wind_speed));
+    H.precipitation_probability.push(n1.details?.probability_of_precipitation != null ? Math.round(n1.details.probability_of_precipitation) : (n1.details?.precipitation_amount > 0 ? 50 : 0));
+    H.precipitation.push(n1.details?.precipitation_amount ?? 0);
+    H.weather_code.push(metCode(n1.summary?.symbol_code));
+    H.wind_speed_10m.push(d.wind_speed ?? null);
+  }
+  const first = raw.properties.timeseries[0];
+  const cur = { temperature_2m: first.data.instant?.details?.air_temperature, weather_code: metCode((first.data.next_1_hours || first.data.next_6_hours)?.summary?.symbol_code) };
+  return { hourly: H, current: cur };
+}
+async function fetchOpenMeteo(lat, lon, tz, force) {
+  const key = `${lat},${lon}`;
+  if (!force && omCache.key === key && omCache.raw && Date.now() - omCache.at < WX_MIN_REFRESH) return omCache.raw;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
     `&hourly=temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,wind_speed_10m` +
-    `&current=temperature_2m,weather_code&wind_speed_unit=ms&timezone=${encodeURIComponent(DATA.settings.timezone || 'Europe/Oslo')}&forecast_days=3`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    `&current=temperature_2m,weather_code&wind_speed_unit=ms&timezone=${encodeURIComponent(tz)}&forecast_days=3`;
+  const res = await fetch(url, { headers: { 'User-Agent': WX_UA }, signal: AbortSignal.timeout(15000) });
   if (!res.ok) throw new Error(`Open-Meteo HTTP ${res.status}`);
-  const j = await res.json();
+  const raw = await res.json();
+  Object.assign(omCache, { key, raw, at: Date.now() });
+  return raw;
+}
+function buildWeather(j, loc, provider) {
   const H = j.hourly;
   const days = [];
   const today = new Date();
@@ -365,9 +432,32 @@ async function getWeather(force = false) {
     }).filter(Boolean);
     days.push({ date, parts, tips: mergeTips(parts) });
   }
-  const data = { location: loc, current: { temp: Math.round(j.current?.temperature_2m), code: j.current?.weather_code, icon: (WMO[j.current?.weather_code] || ['', '🌡️'])[1], summary: (WMO[j.current?.weather_code] || ['—'])[0] }, days, fetchedAt: new Date().toISOString() };
-  weatherCache = { key, at: Date.now(), data };
-  return data;
+  return { location: loc, current: { temp: Math.round(j.current?.temperature_2m), code: j.current?.weather_code, icon: (WMO[j.current?.weather_code] || ['', '🌡️'])[1], summary: (WMO[j.current?.weather_code] || ['—'])[0] }, days, provider, fetchedAt: new Date().toISOString() };
+}
+async function getWeather(force = false) {
+  const loc = DATA.settings.location;
+  const tz = DATA.settings.timezone || 'Europe/Oslo';
+  const lat = Number(loc.latitude).toFixed(4).replace(/\.?0+$/, ''), lon = Number(loc.longitude).toFixed(4).replace(/\.?0+$/, '');
+  const key = `${lat},${lon}`;
+  const errors = [];
+  try {
+    const raw = await fetchMet(lat, lon, force);
+    const data = buildWeather(metToHourly(raw, tz), loc, 'MET Norway');
+    data.fetchedAt = new Date(metCache.at).toISOString();
+    lastGoodWeather = { key, data };
+    return data;
+  } catch (e) { errors.push(String(e.message || e)); console.warn('[weather] MET failed:', e.message || e); }
+  try {
+    const raw = await fetchOpenMeteo(lat, lon, tz, force);
+    const data = buildWeather(raw, loc, 'Open-Meteo');
+    data.fetchedAt = new Date(omCache.at).toISOString();
+    lastGoodWeather = { key, data };
+    return data;
+  } catch (e) { errors.push(String(e.message || e)); console.warn('[weather] Open-Meteo failed:', e.message || e); }
+  // Both down: serve last cached data rather than "unavailable" (rebuilt from cached raw if possible so dates stay current)
+  if (metCache.key === key && metCache.raw) return { ...buildWeather(metToHourly(metCache.raw, tz), loc, 'MET Norway'), fetchedAt: new Date(metCache.at).toISOString(), stale: true };
+  if (lastGoodWeather && lastGoodWeather.key === key) return { ...lastGoodWeather.data, stale: true };
+  throw new Error(errors.join('; '));
 }
 
 // ---------- reminders (travel, meals, birthdays) ----------
@@ -568,7 +658,7 @@ async function api(req, res, url) {
   if (M === 'PUT' && p === '/api/travel-config') { const b = await readBody(req); fs.writeFileSync(TRAVEL_FILE, JSON.stringify(b, null, 2)); return send(res, 200, b); }
 
   // --- mutations ---
-  if (M === 'PUT' && p === '/api/settings') { const b = await readBody(req); DATA.settings = { ...DATA.settings, ...b }; if (b.location) weatherCache = null; saveData(); return send(res, 200, DATA.settings); }
+  if (M === 'PUT' && p === '/api/settings') { const b = await readBody(req); DATA.settings = { ...DATA.settings, ...b }; if (b.location) { weatherCache = null; metCache.key = null; omCache.key = null; lastGoodWeather = null; } saveData(); return send(res, 200, DATA.settings); }
   if (M === 'PUT' && p === '/api/members') { const b = await readBody(req); if (!Array.isArray(b)) return send(res, 400, { error: 'array expected' }); DATA.members = b.map(m => ({ ...m, ageNow: undefined, id: m.id || uid(), name: m.name || 'Name', role: m.role || '', color: m.color || '#8a94a6', birthday: m.birthday || '', age: m.age === '' || m.age == null ? null : Number(m.age), away: !!m.away, notes: m.notes || '', schoolClass: m.schoolClass || '', schoolGroup: m.schoolGroup || '' })); saveData(); return send(res, 200, publicMembers()); }
   let m;
   if (M === 'POST' && (m = p.match(/^\/api\/members\/([^/]+)\/away$/))) { const mem = memberById(m[1]); if (!mem) return send(res, 404, { error: 'no member' }); const b = await readBody(req); mem.away = b.away ?? !mem.away; saveData(); return send(res, 200, mem); }
