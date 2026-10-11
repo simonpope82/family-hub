@@ -207,10 +207,10 @@ function expandIcs(parsed, from, to) {
     if (ev.status === 'CANCELLED') continue;
     const allDay = ev.datetype === 'date' || ev.start.dateOnly === true;
     const dur = ev.end ? ev.end - ev.start : (allDay ? 86400000 : 3600000);
-    const push = (s, src) => {
-      const e = new Date(s.getTime() + (src.end && src.start ? src.end - src.start : dur));
+    const push = (s, src, eOverride, allDayOverride) => {
+      const e = eOverride || new Date(s.getTime() + (src.end && src.start ? src.end - src.start : dur));
       if (e <= from || s >= to) return;
-      out.push({ start: s, end: e, allDay, title: String(src.summary?.val ?? src.summary ?? '(no title)'), location: String(src.location?.val ?? src.location ?? '') });
+      out.push({ start: s, end: e, allDay: allDayOverride ?? allDay, title: String(src.summary?.val ?? src.summary ?? '(no title)'), location: String(src.location?.val ?? src.location ?? '') });
     };
     if (ev.rrule) {
       let dates = [];
@@ -228,7 +228,12 @@ function expandIcs(parsed, from, to) {
     } else {
       let s = new Date(ev.start);
       if (allDay) s = new Date(s.getFullYear(), s.getMonth(), s.getDate());
-      push(s, ev);
+      // Outlook/WeekCal "whole day" entries often arrive as timed events from ~00:00-03:00 to ~00:00-03:00
+      // (midnight UTC, e.g. 02:00 -> 02:00 next day). Show those as all-day (multi-day) events instead.
+      const en = ev.end ? new Date(ev.end) : null;
+      if (!allDay && en && dur >= 20 * 3600000 && s.getHours() <= 3 && en.getHours() <= 3 && s.getMinutes() === 0 && en.getMinutes() === 0) {
+        push(new Date(s.getFullYear(), s.getMonth(), s.getDate()), ev, new Date(en.getFullYear(), en.getMonth(), en.getDate()), true);
+      } else push(s, ev);
     }
   }
   return out;
