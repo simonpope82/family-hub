@@ -19,13 +19,13 @@ function markPast() {
 function render() {
   const members = D.members, byId = Object.fromEntries(members.map(m => [m.id, m]));
   const hideAway = D.settings.hideAwayOnKitchen;
-  $('people').innerHTML = members.filter(m => !(hideAway && m.away)).map(m => `<span class="${m.away ? 'away' : ''}" style="background:${m.color}">${esc(m.name)}${m.away ? ' · away' : ''}</span>`).join('');
+  $('people').innerHTML = members.filter(m => !(hideAway && m.away)).map(m => m.avatar ? `<span class="pic ${m.away ? 'away' : ''}">${avatarHtml(m, 44)}${m.away ? ' away' : ''}</span>` : `<span class="${m.away ? 'away' : ''}" style="background:${m.color}">${esc(m.name)}${m.away ? ' · away' : ''}</span>`).join('');
   const evs = D.events.filter(e => !(hideAway && byId[e.memberId]?.away));
   $('events').innerHTML = evs.length ? evs.map(e => {
     const m = byId[e.memberId];
     const who = m ? m.name : 'Everyone';
     const time = e.allDay || !e.start ? 'All day' : `${e.start}${e.end ? '–' + e.end : ''}`;
-    return `<div class="ev ${m?.away ? 'away' : ''}" data-end="${e.end || ''}"><span class="time">${time}</span><span class="who" style="background:${e.color}">${esc(who)}</span><span class="title">${esc(clean(e.title))}</span></div>`;
+    return `<div class="ev ${m?.away ? 'away' : ''}" data-end="${e.end || ''}"><span class="time">${time}</span>${m?.avatar ? avatarHtml(m, 30) : `<span class="who" style="background:${e.color}">${esc(who)}</span>`}<span class="title">${esc(clean(e.title))}</span></div>`;
   }).join('') : '<div class="muted">Nothing on the calendar today.</div>';
 
   const meal = D.meal;

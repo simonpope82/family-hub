@@ -46,7 +46,7 @@ function eventRow(e) {
   const m = member(e.memberId);
   return `<div class="event ${m?.away ? 'away' : ''}"><div class="bar" style="background:${e.color}"></div><div class="time">${time}</div>
     <div style="flex:1"><div class="title">${esc(e.title.replace(/^EXAMPLE:\s*/i, ''))}${src}${ex}</div>
-    <div class="small muted">${esc(memberName(e.memberId))}${m?.away ? ' (away)' : ''}${e.location ? ' · ' + esc(e.location) : ''}</div></div>${del}</div>`;
+    <div class="small muted">${m ? avatarHtml(m, 22) : esc(memberName(e.memberId))}${m?.away ? ' (away)' : ''}${e.location ? ' · ' + esc(e.location) : ''}</div></div>${del}</div>`;
 }
 function bindEventDeletes(root) {
   root.querySelectorAll('[data-del-event]').forEach(b => b.onclick = async () => { if (!confirm('Delete this event?')) return; await api('/api/events/' + b.dataset.delEvent, { method: 'DELETE' }); render(); });
@@ -87,7 +87,7 @@ function birthdaysHtml(list) {
 }
 function awayToggles() {
   return `<div class="row">${S.members.map(m => `<button class="btn sm" data-away="${m.id}" title="Toggle home/away" style="border-color:${m.color}">
-   <span class="dot" style="background:${m.color}"></span> ${esc(m.name)}${m.ageNow != null ? ` (${m.ageNow})` : ''} · ${m.away ? '🚪 Away' : '🏠 Home'}</button>`).join('')}</div>
+   ${avatarHtml(m, 24, 'initial')} ${m.avatar ? '' : esc(m.name)}${m.ageNow != null ? ` (${m.ageNow})` : ''} · ${m.away ? '🚪 Away' : '🏠 Home'}</button>`).join('')}</div>
    <p class="small muted">Tap a name to mark them away/home. Away people are ${S.settings.hideAwayOnKitchen ? 'hidden on' : 'greyed out on'} the kitchen screen.</p>`;
 }
 function bindAway(root) {
@@ -135,11 +135,11 @@ async function week(v) {
   const events = await api(`/api/events?start=${ymd(weekStart)}&days=7`);
   const days = [...Array(7)].map((_, i) => addDays(weekStart, i));
   v.innerHTML = `<div class="card row"><button class="btn" id="prev">◀</button><b>Week of ${fmtDay(weekStart)}</b><button class="btn" id="next">▶</button><button class="btn" id="thisw">This week</button>
-    <span class="row" style="margin-left:auto">${S.members.map(m => `<span class="chip" style="background:${m.color}">${esc(m.name)}</span>`).join('')}<span class="chip" style="background:#8a94a6">Everyone</span></span></div>
+    <span class="row" style="margin-left:auto">${S.members.map(m => `${m.avatar ? avatarHtml(m, 28) : `<span class="chip" style="background:${m.color}">${esc(m.name)}</span>`}`).join('')}<span class="chip" style="background:#8a94a6">Everyone</span></span></div>
   <div class="week">${days.map(d => {
     const ds = ymd(d), ev = events.filter(e => e.date === ds), meal = S.meals[ds];
     return `<div class="day ${ds === S.today ? 'today' : ''}"><h3>${fmtDay(d)}</h3>
-      ${ev.map(e => `<div class="ev" style="border-color:${e.color}" title="${esc(memberName(e.memberId))}">${e.start ? `<b>${e.start}</b> ` : ''}${esc(e.title.replace(/^EXAMPLE:\s*/i, ''))}<div class="small muted">${esc(memberName(e.memberId))}</div></div>`).join('') || '<div class="small muted">—</div>'}
+      ${ev.map(e => `<div class="ev" style="border-color:${e.color}" title="${esc(memberName(e.memberId))}">${e.start ? `<b>${e.start}</b> ` : ''}${esc(e.title.replace(/^EXAMPLE:\s*/i, ''))}<div class="small muted">${member(e.memberId) ? avatarHtml(member(e.memberId), 20) : esc(memberName(e.memberId))}</div></div>`).join('') || '<div class="small muted">—</div>'}
       ${meal ? `<div class="small" style="margin-top:6px">🍽️ ${esc(meal.dinner.replace(/^EXAMPLE:\s*/i, ''))} ${meal.bought ? '✅' : '🛒'}</div>` : ''}</div>`;
   }).join('')}</div>
   ${Object.entries(S.schoolNotes?.[ymd(weekStart)] || {}).map(([mid, t]) => `<div class="card" style="margin-top:16px"><h2>📝 ${esc(memberName(mid))} — school notes & homework</h2><div style="white-space:pre-wrap">${esc(t)}</div></div>`).join('')}
@@ -161,7 +161,7 @@ async function school(v) {
   v.innerHTML = `<div class="card"><h2>🏫 Weekly school calendar</h2>
     <div class="row"><button class="btn" id="prev">◀</button><b>Week of ${fmtDay(schoolWeek)}</b><button class="btn" id="next">▶</button>
     <button class="btn" id="copy">📋 Copy last week</button><button class="btn danger" id="clear">Clear this week</button></div>
-    <div class="row" style="margin-top:12px">${S.members.map(m => `<button class="btn ${m.id === schoolKid ? 'primary' : ''}" data-kid="${m.id}">${esc(m.name)}</button>`).join('')}</div>
+    <div class="row" style="margin-top:12px">${S.members.map(m => `<button class="btn ${m.id === schoolKid ? 'primary' : ''}" data-kid="${m.id}" title="${esc(m.name)}">${avatarHtml(m, 26)}</button>`).join('')}</div>
     <p class="small muted">Enter times and subject/activity for each day. Saved for this week only — use “Copy last week” next Monday and adjust.</p></div>
     ${await schoolImportCard(wk)}
     <div class="card"><h2>📝 Notes & homework — ${esc(memberName(schoolKid))}, week of ${fmtDay(schoolWeek)}</h2>
@@ -291,7 +291,8 @@ async function settings(v) {
    <form id="fam">${S.members.map(m => `<div class="member-row" data-id="${m.id}">
      <input type="color" name="color" value="${m.color}"><input name="name" value="${esc(m.name)}" placeholder="Name"><input name="role" value="${esc(m.role)}" placeholder="Role">
      <input type="date" name="birthday" value="${esc(m.birthday)}" title="Birthday"><span class="small muted">${m.ageNow != null ? 'age ' + m.ageNow : ''}</span>
-     <label class="small"><input type="checkbox" name="away" ${m.away ? 'checked' : ''}> Away</label></div>`).join('')}
+     <label class="small"><input type="checkbox" name="away" ${m.away ? 'checked' : ''}> Away</label>
+     ${avatarHtml(m, 32, 'initial')}<label class="btn sm" title="Temporary: resets when the server restarts. Use private/add-avatar.py for a permanent photo.">📷 Photo<input type="file" accept="image/*" data-avatar="${m.id}" hidden></label>${m.avatar ? `<button type="button" class="btn sm" data-avatar-del="${m.id}">✕</button>` : ''}</div>`).join('')}
    <div class="row" style="margin-top:8px"><label>Clothing tips for <select name="tipsFor">${memberOptions(S.settings.tipsForMemberId, false)}</select></label>
      <label><input type="checkbox" name="hideAway" ${S.settings.hideAwayOnKitchen ? 'checked' : ''}> Hide away people completely on the kitchen screen</label>
      <label>Birthday reminder <input type="number" name="bdays" min="0" max="60" value="${S.settings.birthdayReminderDays}" style="width:70px"> days ahead</label></div>
@@ -314,6 +315,8 @@ async function settings(v) {
     $('#geoRes').innerHTML = res.length ? res.map((r, i) => `<button class="btn sm" data-i="${i}" style="margin:4px 4px 0 0">${esc(r.name)}${r.admin1 ? ', ' + esc(r.admin1) : ''}, ${esc(r.country || '')}</button>`).join('') : '<p class="muted">No places found.</p>';
     $('#geoRes').querySelectorAll('[data-i]').forEach(b => b.onclick = async () => { const r = res[b.dataset.i]; await api('/api/settings', { method: 'PUT', body: { location: { name: r.name, country: r.country, latitude: r.latitude, longitude: r.longitude, isDefault: false } } }); await load(); render(); });
   };
+  v.querySelectorAll('[data-avatar]').forEach(i => i.onchange = async () => { if (!i.files[0]) return; const avatar = await fileToAvatar(i.files[0]); await api(`/api/members/${i.dataset.avatar}/avatar`, { method: 'POST', body: { avatar } }); location.reload(); });
+  v.querySelectorAll('[data-avatar-del]').forEach(b => b.onclick = async () => { await api(`/api/members/${b.dataset.avatarDel}/avatar`, { method: 'POST', body: { avatar: '' } }); location.reload(); });
   $('#fam').onsubmit = async e => {
     e.preventDefault();
     const members = [...v.querySelectorAll('.member-row')].map(r => { const old = member(r.dataset.id); return { ...old, name: r.querySelector('[name=name]').value, role: r.querySelector('[name=role]').value, color: r.querySelector('[name=color]').value, birthday: r.querySelector('[name=birthday]').value, away: r.querySelector('[name=away]').checked }; });

@@ -36,6 +36,8 @@
   .ev.away{opacity:.45}
   .people{display:flex;flex-wrap:wrap;gap:.6vw;margin-bottom:.6vw}
   .people span{padding:.15em .7em;border-radius:999px;font-weight:700;color:#0f1420;font-size:.85em}
+  .people span.pic{background:none!important;padding:0}
+  .people span.pic.away img{opacity:.4;filter:grayscale(1)}
   .people span.away{background:transparent!important;color:var(--muted);border:2px dashed var(--line)}
   .parts{display:grid;grid-template-columns:repeat(3,1fr);gap:.8vw}
   .part{background:#222b3d;border-radius:14px;padding:.8vw}
@@ -71,6 +73,7 @@
     </div>
   </div>
 </div>
+<script src="/avatar.js"></script>
 <script src="/kitchen.js"></script>
 </body>
 </html>
