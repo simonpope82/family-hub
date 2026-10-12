@@ -15,7 +15,7 @@ const crypto = require('crypto');
 const AUTH_FILE = path.join(ROOT, 'config', 'auth.json');
 
 // ---------- private config: env var -> Render Secret File (/etc/secrets) -> local file ----------
-// Private data (family members, calendar links, password hash, trip plan) is never committed.
+// Private data (family members, calendar links, password hash) is never committed.
 // Env values may be raw JSON/HTML or base64 of it.
 const SECRETS_DIR = process.env.SECRETS_DIR || '/etc/secrets';
 function decodeMaybeB64(v) {
@@ -30,18 +30,6 @@ function readPrivate(envName, secretName, ...localPaths) {
   }
   return null;
 }
-const TRIP_SOURCES = () => [
-  process.env.TRIP_FILE,
-  path.join(SECRETS_DIR, 'trip.html'),
-  path.join(ROOT, 'private', 'trip.html'),
-  path.join(ROOT, '..', 'costa-rica-trip', 'index.html'),
-].filter(Boolean);
-function getTripHtml() {
-  if (process.env.TRIP_HTML) return decodeMaybeB64(process.env.TRIP_HTML);
-  for (const p of TRIP_SOURCES()) { try { return fs.readFileSync(p); } catch {} }
-  return null;
-}
-
 // ---------- date helpers (local time = Europe/Oslo) ----------
 const pad = n => String(n).padStart(2, '0');
 const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -731,11 +719,6 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(302, { Location: '/login?next=' + encodeURIComponent(pth + url.search), 'Cache-Control': 'no-store' }); return res.end();
     }
     if (pth.startsWith('/api/')) return await api(req, res, url);
-    if (pth === '/trip' || pth === '/trip/') { // Costa Rica trip plan (TRIP_HTML env / trip.html Secret File / private/trip.html), behind the same login
-      const buf = getTripHtml();
-      if (!buf) return send(res, 404, 'Trip plan not found', 'text/plain');
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' }); return res.end(buf);
-    }
     let file = pth === '/' ? '/index.html' : pth === '/kitchen' ? '/kitchen.html' : pth === '/login' ? '/login.html' : pth === '/apple-touch-icon-precomposed.png' ? '/apple-touch-icon.png' : pth === '/favicon.ico' ? '/favicon.png' : pth;
     const fp = path.normalize(path.join(PUBLIC, file));
     if (!fp.startsWith(PUBLIC)) return send(res, 403, 'Forbidden', 'text/plain');
